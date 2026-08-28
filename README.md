@@ -1,10 +1,6 @@
 # CU-MCP-Bridge
 
-BepInEx mod + Python MCP server — lets AI assistants control [Casualties Unknown](https://store.steampowered.com/app/Casualties_Unknown) gameplay in real time.
-
-## What it does
-
-The AI can read player state, move around the map, pick up and use items, heal wounds, query terrain, and even clone an AI companion to act alongside the player. Everything is driven by natural language through any MCP-compatible AI client (e.g. [opencode](https://opencode.ai)).
+BepInEx mod + Python MCP server that lets AI assistants control [Casualties Unknown](https://store.steampowered.com/app/Casualties_Unknown) gameplay in real time via named pipe.
 
 ## Requirements
 
@@ -58,30 +54,6 @@ Add to your MCP configuration (e.g. `opencode.json`):
 
 > Order matters: the server must start *after* the game is running.
 
-## MCP Tools
-
-| Tool | Description |
-|---|---|
-| `get_game_state` | Player state (position, health, inventory) + environment snapshot |
-| `get_map_info` | Terrain and entity info around the player |
-| `get_nearby_items` | List dropped items near the player |
-| `query_position` | Query entities/terrain at a specific world coordinate |
-| `search_blocks` | Search terrain by material name (e.g. "sand", "rock") |
-| `move_to` | Move the active player to a world position |
-| `move_to_player` | Move the AI companion to the human player |
-| `follow` | Make the AI companion follow the human |
-| `jump` | Jump (supports horizontal direction) |
-| `use_item` | Use an inventory item |
-| `pick_up_item` | Pick up a nearby item (by name or nearest) |
-| `drop_item` | Drop an inventory item |
-| `sleep` | Rest to recover energy |
-| `heal_ai` | Heal a specific limb on the AI companion |
-| `create_ai_player` | Clone an AI companion next to the human |
-| `destroy_ai_player` | Remove the AI companion |
-| `set_contingency` | Set condition-action rules (e.g. "heal if HP < 30%") |
-| `update_contingency` | Update contingency rules at runtime |
-| `user_interact` | Highest-priority human intervention |
-
 ## Building from source
 
 ```bash
@@ -93,6 +65,28 @@ dotnet build BepInEx/CU-MCP-Mod.csproj -c Release
 ```
 
 Output: `BepInEx/bin/Release/net472/CU-MCP-Mod.dll`
+
+## Architecture
+
+```
+AI Client (opencode)
+        |
+    stdio (JSON-RPC)
+        |
+Python FastMCP Server (src/bridge_server/)
+        |
+    Named Pipe (win32pipe, newline-delimited JSON)
+        |
+C# BepInEx Mod (BepInEx/, inside Unity game)
+        |
+    Unity Game (Casualties Unknown)
+```
+
+### Communication
+
+- **AI -> Game**: Orders are sent over the named pipe and executed on Unity's main thread
+- **Game -> AI**: Player state and query results flow back over the same pipe
+- **Blocking**: Each command blocks until the mod reports completion (success/failure/timeout)
 
 ## Project structure
 
@@ -117,15 +111,29 @@ CU-MCP-Bridge/
 └── requirements.txt        # Python dependencies
 ```
 
-## Communication
+## MCP Tools
 
-```
-AI Client (opencode)  ←→  Python MCP Server  ←→  Named Pipe  ←→  C# BepInEx Mod  ←→  Unity Game
-```
-
-- **AI → Game**: Orders are sent over the named pipe and executed on Unity's main thread
-- **Game → AI**: Player state and query results flow back over the same pipe
-- **Blocking**: Each command blocks until the mod reports completion (success/failure/timeout)
+| Tool | Description |
+|---|---|
+| `get_game_state` | Player state (position, health, inventory) + environment snapshot |
+| `get_map_info` | Terrain and entity info around the player |
+| `get_nearby_items` | List dropped items near the player |
+| `query_position` | Query entities/terrain at a specific world coordinate |
+| `search_blocks` | Search terrain by material name (e.g. "sand", "rock") |
+| `move_to` | Move the active player to a world position |
+| `move_to_player` | Move the AI companion to the human player |
+| `follow` | Make the AI companion follow the human |
+| `jump` | Jump (supports horizontal direction) |
+| `use_item` | Use an inventory item |
+| `pick_up_item` | Pick up a nearby item (by name or nearest) |
+| `drop_item` | Drop an inventory item |
+| `sleep` | Rest to recover energy |
+| `heal_ai` | Heal a specific limb on the AI companion |
+| `create_ai_player` | Clone an AI companion next to the human |
+| `destroy_ai_player` | Remove the AI companion |
+| `set_contingency` | Set condition-action rules (e.g. "heal if HP < 30%") |
+| `update_contingency` | Update contingency rules at runtime |
+| `user_interact` | Highest-priority human intervention |
 
 ## Known issues
 
