@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "cu-mcp-bridge": {
+      "command": "python",
+      "args": ["src/bridge_server/server.py"],
+      "cwd": "C:\\Users\\Administrator\\Desktop\\work\\CU-MCP-Bridge"
+    }
+  }
+}

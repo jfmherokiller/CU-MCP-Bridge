@@ -1,0 +1,30 @@
+# Build artifacts
+bin/
+obj/
+
+# IDE files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Python
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+
+# Release / packaging
+release/
+*.zip
+IBuild/
+
+# Old src tree (rolled back, not maintained)
+src/bridge_mod/
+src/bridge_mod.backup*/
+src/bridge_server.backup*/
+
+# OS
+Thumbs.db
+.DS_Store
