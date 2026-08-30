@@ -6,12 +6,10 @@ import time
 
 from mcp.server.fastmcp import FastMCP
 
-from pipe_server import PipeServer
+from pipe_server import PipeServer, PIPE_NAME, SOCKET_PATH
 from state_manager import StateManager
 from order_manager import OrderManager, Order
 from contingency import ContingencyManager, ContingencyRule
-
-PIPE_NAME = r"\\.\pipe\CU-MCP-Bridge"
 
 pipe: PipeServer = None
 state_mgr: StateManager = None
@@ -388,7 +386,7 @@ def user_interact(message: str) -> dict:
 def main():
     global pipe, state_mgr, order_mgr, contingency_mgr
 
-    print("[CU-MCP] Starting bridge server...")
+    print(f"[CU-MCP] Starting bridge server (platform={sys.platform})...")
     pipe = PipeServer(PIPE_NAME)
     state_mgr = StateManager(pipe)
     order_mgr = OrderManager(pipe)
@@ -398,7 +396,7 @@ def main():
     def _connect():
         try:
             pipe.wait_for_connect()
-            print("[CU-MCP] Game connected via NamedPipe")
+            print("[CU-MCP] Game connected")
             pipe.send({"type": "ping", "data": {"hello": "from_python"}})
             print("[CU-MCP] Initial ping sent")
             state_mgr.start()
