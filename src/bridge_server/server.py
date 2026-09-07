@@ -6,7 +6,7 @@ import time
 
 from mcp.server.fastmcp import FastMCP
 
-from pipe_server import PipeServer, PIPE_NAME, SOCKET_PATH
+from transport import HttpBridgeServer as PipeServer, PIPE_NAME, SOCKET_PATH, DEFAULT_HOST, DEFAULT_PORT
 from state_manager import StateManager
 from order_manager import OrderManager, Order
 from contingency import ContingencyManager, ContingencyRule
@@ -387,6 +387,8 @@ def main():
     global pipe, state_mgr, order_mgr, contingency_mgr
 
     print(f"[CU-MCP] Starting bridge server (platform={sys.platform})...")
+    print(f"[CU-MCP] Game link: HTTP on http://{DEFAULT_HOST}:{DEFAULT_PORT} "
+          f"(override with CU_MCP_HTTP_HOST / CU_MCP_HTTP_PORT)")
     pipe = PipeServer(PIPE_NAME)
     state_mgr = StateManager(pipe)
     order_mgr = OrderManager(pipe)
@@ -401,7 +403,7 @@ def main():
             print("[CU-MCP] Initial ping sent")
             state_mgr.start()
         except Exception as e:
-            print(f"[CU-MCP] Pipe connection failed: {e}")
+            print(f"[CU-MCP] Game transport error: {e}")
 
     t = threading.Thread(target=_connect, daemon=True)
     t.start()

@@ -13,12 +13,16 @@
 - **根因**: OrderExecutor 中没有 `sleep`/`rest` 等动作
 - **修复**: 添加 `HandleSleep()` → 调用 `body.TakeANap()`；新增 `sleep`/`rest` 两个 action 别名
 
-## 3. Python→C# Named Pipe 写入断开
+## 3. Python→C# Named Pipe 写入断开 — ⚠️ 传输层已替换
 - **文件**: `server/server.py` → `BridgePlugin.cs`
 - **现象**: C# 侧收到初始 ping 后，任何后续 Python 向 pipe 写入都会导致 C# 端断开连接（ReadLoop 退出）
 - **根因**: 未确定（可能是 pipe 读写锁竞争或 Dispose 时机问题）
 - **影响**: 文件队列是唯一可用的命令通道
 - **当前绕过**: 使用 `cu_mcp_commands.json` 文件队列
+- **2026-09 更新**: 命名管道已整体替换为本地 HTTP 传输（`transport.py` /
+  `HttpBridgeClient.cs`）。脆弱的管道双工写入不复存在——Python→C# 方向改为
+  C# 侧长轮询 `GET /poll`。`cu_mcp_commands.json` 文件队列作为独立回退保留，
+  未改动。需在游戏内实测确认此 bug 不再复现。
 
 ## 4. `pick_up_item` 参数名不匹配 — ✅ 已修复
 - **文件**: `Executor/OrderExecutor.cs:470`

@@ -2,7 +2,7 @@ using System;
 using BepInEx;
 using HarmonyLib;
 using UnityEngine;
-using CUMCP.Pipe;
+using CUMCP.Transport;
 using CUMCP.Collector;
 using CUMCP.Executor;
 using CUMCP.Contingency;
@@ -16,7 +16,7 @@ namespace CUMCP
         internal static BridgePlugin Instance;
         internal new static BepInEx.Logging.ManualLogSource Log => Instance?.Logger;
 
-        private PipeClient _pipe;
+        private HttpBridgeClient _pipe;
         private DataCollector _collector;
         private FileCommandQueue _fileQueue;
         private OrderExecutor _executor;
@@ -32,7 +32,7 @@ namespace CUMCP
         void Awake()
         {
             Instance = this;
-            Pipe.PipeClient.Log = (msg) => Logger.LogInfo("[CU-MCP] " + msg);
+            Transport.HttpBridgeClient.Log = (msg) => Logger.LogInfo("[CU-MCP] " + msg);
 
             _debugGui = gameObject.AddComponent<DebugGUI>();
 
@@ -42,7 +42,7 @@ namespace CUMCP
             Harmony.CreateAndPatchAll(typeof(Executor.WoundViewAIPatch));
             Harmony.CreateAndPatchAll(typeof(Executor.WallJumpTrigger.Patch));
 
-            _pipe = new PipeClient();
+            _pipe = new HttpBridgeClient(MCPConfig.Instance.http_url);
             _collector = new DataCollector(_pipe);
             _executor = new OrderExecutor(_pipe, this);
             _fileQueue = new FileCommandQueue(_pipe, _executor);
@@ -196,7 +196,7 @@ namespace CUMCP
             _pipe.Send(MessageBuilder.StateUpdate(new { player = playerState, environment = result, query_x = qx, query_y = qy }));
         }
 
-        public PipeClient GetPipe() => _pipe;
+        public HttpBridgeClient GetPipe() => _pipe;
         public OrderExecutor GetExecutor() => _executor;
     }
 }

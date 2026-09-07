@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using CUMCP.Protocol;
-using CUMCP.Pipe;
+using CUMCP.Transport;
 
 namespace CUMCP.Executor
 {
@@ -12,7 +12,7 @@ namespace CUMCP.Executor
         public event Action<string> OnOrderCompleted;
         public event Action<string, string> OnOrderFailed;
 
-        private readonly PipeClient _pipe;
+        private readonly HttpBridgeClient _pipe;
         private readonly Pathfinder _pathfinder = new Pathfinder();
         private MonoBehaviour _coroutineHost;
         private Coroutine _activeCoroutine;
@@ -23,7 +23,7 @@ namespace CUMCP.Executor
 
         public bool IsBusy => _currentOrder != null;
 
-        public OrderExecutor(PipeClient pipe, MonoBehaviour coroutineHost)
+        public OrderExecutor(HttpBridgeClient pipe, MonoBehaviour coroutineHost)
         {
             _pipe = pipe;
             _coroutineHost = coroutineHost;
