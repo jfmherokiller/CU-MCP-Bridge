@@ -102,8 +102,8 @@ The mod drives both directions against the server:
 
 - `GET /poll?timeout=<sec>` — long-poll for the next **AI -> Game** message
   (order / query / contingency); `204` means "nothing yet, poll again".
-- `POST /message` — **Game -> AI** player state, query/search results, acks,
-  interrupts (newline-delimited JSON; batches allowed).
+- `POST /message` — **Game -> AI** player state, query/search results, order
+  results, acks, interrupts (newline-delimited JSON; batches allowed).
 - `GET /health` — liveness / `connected` flag.
 
 Message payloads are byte-for-byte the same newline-delimited JSON `Message`

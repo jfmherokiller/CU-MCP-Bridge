@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using BepInEx;
 using HarmonyLib;
 using UnityEngine;
@@ -18,10 +19,14 @@ namespace CUMCP
 
         private HttpBridgeClient _pipe;
         private DataCollector _collector;
-        private FileCommandQueue _fileQueue;
         private OrderExecutor _executor;
         private InterruptDetector _interruptDetector;
         private ContingencyRunner _contingency;
+
+        // Transport callbacks fire on background threads; Unity API calls must run
+        // on the main thread, so inbound messages are parked here and drained in Update().
+        private readonly ConcurrentQueue<Message> _mainThreadQueue = new ConcurrentQueue<Message>();
+
         private float _tickTimer;
         private float _watchdogTimer;
         private const float TICK_INTERVAL = 0.5f;
@@ -45,12 +50,14 @@ namespace CUMCP
             _pipe = new HttpBridgeClient(MCPConfig.Instance.http_url);
             _collector = new DataCollector(_pipe);
             _executor = new OrderExecutor(_pipe, this);
-            _fileQueue = new FileCommandQueue(_pipe, _executor);
             _interruptDetector = new InterruptDetector(_pipe);
             _contingency = new ContingencyRunner();
 
-            _pipe.OnError += (err) => Logger.LogWarning($"[CU-MCP] Pipe: {err}");
-            _pipe.OnDisconnected += () => Logger.LogInfo("[CU-MCP] Pipe disconnected");
+            _executor.OnOrderCompleted += (id) => _pipe.Send(MessageBuilder.OrderResult(id, true));
+            _executor.OnOrderFailed += (id, reason) => _pipe.Send(MessageBuilder.OrderResult(id, false, reason));
+
+            _pipe.OnError += (err) => Logger.LogWarning($"[CU-MCP] Transport: {err}");
+            _pipe.OnDisconnected += () => Logger.LogInfo("[CU-MCP] Transport disconnected");
             _pipe.OnMessage += HandleMessage;
 
             Logger.LogInfo("[CU-MCP] Plugin loaded, version 0.1.0");
@@ -76,6 +83,9 @@ namespace CUMCP
 
         void Update()
         {
+            while (_mainThreadQueue.TryDequeue(out var queued))
+                ProcessMessageOnMainThread(queued);
+
             _tickTimer += Time.deltaTime;
             _watchdogTimer += Time.deltaTime;
 
@@ -104,7 +114,6 @@ namespace CUMCP
             _tickTimer = 0;
 
             if (!_pipe.Connected) return;
-            _fileQueue.CheckAndExecute();
             _collector.Tick();
             _interruptDetector.Tick();
             _contingency.Tick();
@@ -115,9 +124,14 @@ namespace CUMCP
             _pipe?.Disconnect();
         }
 
+        // Background thread: just hand off to the main thread.
         private void HandleMessage(Message msg)
         {
-            BridgePlugin.Log.LogInfo($"[CU-MCP] Msg received: type={msg.Type} seq={msg.Seq}");
+            _mainThreadQueue.Enqueue(msg);
+        }
+
+        private void ProcessMessageOnMainThread(Message msg)
+        {
             switch (msg.Type)
             {
                 case "order":
@@ -126,8 +140,11 @@ namespace CUMCP
                     break;
 
                 case "query":
-                    BridgePlugin.Log.LogInfo("[CU-MCP] Query dispatch");
                     HandleQuery(msg);
+                    break;
+
+                case "search":
+                    HandleSearch(msg);
                     break;
 
                 case "contingency_update":
@@ -194,6 +211,27 @@ namespace CUMCP
             scan.ScanAtPosition(new Vector2(qx, qy), qrange, result);
             BridgePlugin.Log.LogInfo($"[CU-MCP] Query result: {result.Entities.Count} ents, {result.NearbyTerrain.Count} blocks");
             _pipe.Send(MessageBuilder.StateUpdate(new { player = playerState, environment = result, query_x = qx, query_y = qy }));
+        }
+
+        private void HandleSearch(Message msg)
+        {
+            var data = msg.Data;
+            if (data == null) return;
+
+            string material = data["material"]?.ToString() ?? "";
+            float sx = data["x"]?.ToObject<float>() ?? 0f;
+            float sy = data["y"]?.ToObject<float>() ?? 0f;
+            int range = data["range"]?.ToObject<int>() ?? 100;
+            int limit = data["limit"]?.ToObject<int>() ?? 20;
+
+            var body = AIPlayerManager.GetActiveBody();
+            Vector2 center = body != null ? (Vector2)body.transform.position : new Vector2(sx, sy);
+            if (data["x"] != null && data["y"] != null)
+                center = new Vector2(sx, sy);
+
+            var searchResult = new Collector.EnvironmentScan().SearchBlocks(material, center, range, limit);
+            BridgePlugin.Log.LogInfo($"[CU-MCP] Search '{material}' -> {searchResult?.TotalMatched ?? 0} match(es)");
+            _pipe.Send(MessageBuilder.StateUpdate(new { search_result = searchResult }));
         }
 
         public HttpBridgeClient GetPipe() => _pipe;
