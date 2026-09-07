@@ -24,9 +24,20 @@ Copy the two DLLs from `mod/` into your game's `BepInEx/plugins/` folder:
 
 ### 2. Install Python dependencies
 
+With [uv](https://docs.astral.sh/uv/) (recommended — `pyproject.toml` + `uv.lock`
+are checked in):
+
+```bash
+uv sync
+```
+
+or with pip:
+
 ```bash
 pip install -r requirements.txt
 ```
+
+Standard library only otherwise — no `pywin32`, no native transport dependency.
 
 ### 3. Configure your AI client
 
