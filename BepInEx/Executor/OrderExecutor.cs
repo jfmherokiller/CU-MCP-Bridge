@@ -68,6 +68,9 @@ namespace CUMCP.Executor
                 case "heal_ai":
                     HandleHealAI(order);
                     break;
+                case "console":
+                    HandleConsole(order);
+                    break;
                 default:
                     OnOrderFailed?.Invoke(order.Id, $"Unknown action: {order.Action}");
                     _currentOrder = null;
@@ -81,6 +84,43 @@ namespace CUMCP.Executor
                 _coroutineHost.StopCoroutine(_activeCoroutine);
             _currentOrder = null;
             _activeCoroutine = null;
+        }
+
+        // "console": run a dev-console command line as if typed in-game.
+        //   parameters: { "command": "inflate 0.4" }
+        // Runs on the Unity main thread (orders are dispatched from
+        // BridgePlugin.ProcessMessageOnMainThread). ConsoleScript.TryExecuteCommand
+        // is private, so it is invoked via reflection.
+        private void HandleConsole(OrderParams order)
+        {
+            var line = order.Parameters?["command"]?.ToString();
+            if (string.IsNullOrEmpty(line) || line.Trim().Length == 0)
+            {
+                OnOrderFailed?.Invoke(order.Id, "console: missing 'command'");
+                _currentOrder = null;
+                return;
+            }
+
+            try
+            {
+                var cs = ConsoleScript.instance;
+                if (cs == null)
+                {
+                    OnOrderFailed?.Invoke(order.Id, "console: ConsoleScript.instance is null (not in a run?)");
+                }
+                else
+                {
+                    var args = line.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    HarmonyLib.Traverse.Create(cs).Method("TryExecuteCommand", new object[] { args, true }).GetValue();
+                    BridgePlugin.Log.LogInfo($"[CU-MCP] console: {line}");
+                    OnOrderCompleted?.Invoke(order.Id);
+                }
+            }
+            catch (Exception e)
+            {
+                OnOrderFailed?.Invoke(order.Id, $"console error: {e.Message}");
+            }
+            _currentOrder = null;
         }
 
         private IEnumerator MoveToRoutine(OrderParams order)
